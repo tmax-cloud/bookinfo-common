@@ -33,11 +33,11 @@ publishing {
     }
     repositories {
         maven {
-            url = 'http://localhost:18080/repository/maven-releases/'
+            url = 'http://localhost:8081/repository/maven-releases/'
             allowInsecureProtocol = true
             credentials {
                 username= 'admin'
-                password= '3include'
+                password= '123'
             }
         }
     }
