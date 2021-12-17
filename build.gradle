@@ -8,10 +8,13 @@ repositories {
 }
 
 dependencies {
-    // https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-core
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.13.0'
-    // https://mvnrepository.com/artifact/com.fasterxml.jackson.core/jackson-annotations
-    implementation group: 'com.fasterxml.jackson.core', name: 'jackson-annotations', version: '2.13.0'
+    // https://mvnrepository.com/artifact/org.projectlombok/lombok
+    compileOnly 'org.projectlombok:lombok:1.18.22'
+
+    annotationProcessor 'org.projectlombok:lombok:1.18.22'
+
+    implementation 'com.fasterxml.jackson.core:jackson-core:2.13.0'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:2.13.0'
 }
 
 test {
