@@ -36,7 +36,7 @@ publishing {
     }
     repositories {
         maven {
-            url = 'http://172.11.22.2:32428/repository/maven-releases/'
+            url = 'http://172.22.11.2:32428/repository/maven-releases/'
             allowInsecureProtocol = true
             credentials {
                 username= 'admin'
