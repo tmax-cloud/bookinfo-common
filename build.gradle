@@ -36,7 +36,7 @@ publishing {
     }
     repositories {
         maven {
-            url = 'http://1458-220-94-163-19.ngrok.io/repository/maven-releases/'
+            url = 'http://172.11.22.2:32428/repository/maven-releases/'
             allowInsecureProtocol = true
             credentials {
                 username= 'admin'

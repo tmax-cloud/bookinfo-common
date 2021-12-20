@@ -20,6 +20,6 @@ spec:
           gradle build
           gradle publish
         when:
-          branch:
-            - main
+          tag:
+            - v.*
       
