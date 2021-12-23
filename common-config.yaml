@@ -155,6 +155,7 @@ spec:
         image: docker.io/gradle:7.3.1-jdk11
         script: |
           gradle build
+          gradle sonarqube
           gradle publish
         when:
           tag:

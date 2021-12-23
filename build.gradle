@@ -1,10 +1,25 @@
 plugins {
     id 'java-library'
     id 'maven-publish'
+    id 'org.sonarqube' version '3.3'
 }
 
 repositories {
     mavenCentral()
+}
+
+sonarqube {
+    properties {
+        property "sonar.host.url", "http://sonarqube.172.22.11.16.nip.io"
+        property "sonar.sourceEncoding", "UTF-8"
+        property "sonar.login", "admin"
+        property "sonar.password", "tmax@23"
+        property "sonar.projectKey", "common-sonar"
+        property "sonar.language", "java"
+        property "sonar.sources", "src/main/java"
+        property "sonar.java.binaries", "build/classes/java/main"
+        property "sonar.java.libraries", "build/libs"
+    }
 }
 
 dependencies {
@@ -30,7 +45,7 @@ publishing {
         bookLibrary(MavenPublication) {
             groupId = 'org.tmaxcloud.sample.msa.book'
             artifactId = 'common'
-            version = '0.0.1'
+            version = '0.0.3'
             from components.java
         }
     }
