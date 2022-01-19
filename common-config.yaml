@@ -88,105 +88,191 @@ data:
   sonar-project.properties: "# required metdata\nsonar.projectKey=sonar-test\nsonar.login=admin\nsonar.projectVersion=0.1\nsonar.sourceEncoding=UTF-8\n
     sonar.password=tmax@23\nsonar.sources=src/main/java/\nsonar.language=java\nsonar.java.binaries=src/main/java"
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
+apiVersion: tmax.io/v1
+kind: ClusterTemplate
 metadata:
-  name: common-pvc
-spec:
-  resources:
-    requests:
-      storage: 1Gi
-  volumeMode: Filesystem
-  accessModes:
-    - ReadWriteOnce
+  name: gradle-publish-integrationconfig-template
+parameters:
+  - name: CONFIG_NAME
+    displayName: ConfigName
+    description: Integration Config Name
+    required: true
+    valueType: string
+  - name: CONFIG_SECRET
+    displayName: ConfigSecret
+    description: Secret to be included in Service Account (Usually docker hub secret)
+    required: false
+    valueType: string
+  - name: GIT_TYPE
+    displayName: GitType
+    description: Git repo type (github/gitlab)
+    required: true
+    valueType: string
+  - name: GIT_API_URL
+    displayName: GitApiUrl
+    description: Git repo API Server URL
+    required: false
+    value: ""
+    valueType: string
+  - name: GIT_REPO
+    displayName: GitRepo
+    description: Git repo path (ex. tmax-cloud/bookinfo-common)
+    required: true
+    valueType: string
+  - name: TOKEN_SECRET_NAME
+    displayName: TokenSecretName
+    description: Name of secret containing token info
+    required: true
+    valueType: string
+  - name: WORKSPACE_NAME
+    displayName: WorkspaceName
+    description: Workspace Name
+    required: true
+    valueType: string
+  - name: PVC_NAME
+    displayName: PVCName
+    description: PVC Name
+    requierd: true
+    valueType: string
+  - name: SONAR_HOST_URL_TPL
+    displayName: SonarHostURL
+    description: URL of sonarqube
+    required: true
+    valueType: string
+  - name: SONAR_PROJECT_KEY_TPL
+    displayName: SonarProjectKey
+    description: Sonar project key. If not defined, use default sonar property.
+    required: false
+    valueType: string
+objects:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: ${PVC_NAME}
+    spec:
+      resources:
+        requests:
+          storage: 1Gi
+      volumeMode: Filesystem
+      accessModes:
+        - ReadWriteOnce
+  - apiVersion: cicd.tmax.io/v1
+    kind: IntegrationConfig
+    metadata:
+      name: ${CONFIG_NAME}
+    spec:
+      git:
+        type: ${GIT_TYPE}
+        apiUrl: ${GIT_API_URL}
+        repository: ${GIT_REPO}
+        token:
+          valueFrom:
+            secretKeyRef:
+              name: ${TOKEN_SECRET_NAME}
+              key: token
+      workspaces:
+        - name: ${WORKSPACE_NAME}
+          persistentVolumeClaim:
+            claimName: ${PVC_NAME}
+        - name: sonar-settings
+          configMap:
+            name: sonar-properties
+      secrets:
+        - name: ${CONFIG_SECRET}
+      jobs:
+        preSubmit:
+          - name: copy-source
+            image: docker.io/alpine:3.13.6
+            script: |
+              cp -r ./src $(workspaces.${WORKSPACE_NAME}.path)/src
+            when:
+              branch:
+                - main
+          - name: code-analysis
+            tektonTask:
+              taskRef:
+                local:
+                  name: sonarqube-scanner
+                  kind: Task
+              params:
+                - name: SONAR_HOST_URL
+                  stringVal: ${SONAR_HOST_URL_TPL}
+                - name: SONAR_PROJECT_KEY
+                  stringVal: ${SONAR_PROJECT_KEY_TPL}
+              workspaces:
+                - name: source-dir
+                  workspace: ${WORKSPACE_NAME}
+                - name: sonar-settings
+                  workspace: sonar-settings
+            after:
+              - copy-source
+            when:
+              branch:
+                - main
+        postSubmit:
+          - name: copy-source
+            image: docker.io/alpine:3.13.6
+            script: |
+              cp -r ./src $(workspaces.${WORKSPACE_NAME}.path)/src
+            when:
+              branch:
+                - main
+          - name: code-analysis
+            tektonTask:
+              taskRef:
+                local:
+                  name: sonarqube-scanner
+                  kind: Task
+              params:
+                - name: SONAR_HOST_URL
+                  stringVal: ${SONAR_HOST_URL_TPL}
+                - name: SONAR_PROJECT_KEY
+                  stringVal: ${SONAR_PROJECT_KEY_TPL}
+              workspaces:
+                - name: source-dir
+                  workspace: ${WORKSPACE_NAME}
+                - name: sonar-settings
+                  workspace: sonar-settings
+            after:
+              - copy-source
+            when:
+              branch:
+                - main
+          - name: gradle-build-and-publish
+            image: docker.io/gradle:7.3.1-jdk11
+            script: |
+              gradle build
+              gradle sonarqube
+              gradle publish
+            when:
+              tag:
+                - v.*
 ---
-apiVersion: cicd.tmax.io/v1
-kind: IntegrationConfig
+apiVersion: tmax.io/v1
+kind: TemplateInstance
 metadata:
-  name: bookinfo-common-config
+  name: bookinfo-common-ic-instance
+  namespace: default
 spec:
-  git:
-    type: github
-    apiUrl: ""
-    repository: tmax-cloud/bookinfo-common
-    token:
-      valueFrom:
-        secretKeyRef:
-          name: yxzzzxh-git-token
-          key: token
-  workspaces:
-  - name : common-workspace
-    persistentVolumeClaim:
-      claimName: common-pvc
-  - name: sonar-settings
-    configMap:
-      name: sonar-properties
-  jobs:
-    preSubmit:
-      - name: copy-source
-        image: docker.io/alpine:3.13.6
-        script: |
-          cp -r ./src $(workspaces.common-workspace.path)/src
-        when:
-          branch: 
-          - main
-      - name: code-analysis
-        tektonTask:
-          taskRef:
-            local:
-              name: sonarqube-scanner
-              kind: Task
-          params:
-          - name: SONAR_HOST_URL
-            stringVal: http://sonarqube.172.22.11.16.nip.io
-          - name: SONAR_PROJECT_KEY
-            stringVal: common-sonar
-          workspaces:
-          - name: source-dir
-            workspace: common-workspace
-          - name: sonar-settings
-            workspace: sonar-settings
-        after:
-        - copy-source
-        when:
-          branch: 
-          - main
-    postSubmit:
-      - name: copy-source
-        image: docker.io/alpine:3.13.6
-        script: |
-          cp -r ./src $(workspaces.common-workspace.path)/src
-        when:
-          branch: 
-          - main
-      - name: code-analysis
-        tektonTask:
-          taskRef:
-            local:
-              name: sonarqube-scanner
-              kind: Task
-          params:
-          - name: SONAR_HOST_URL
-            stringVal: http://sonarqube.172.22.11.16.nip.io
-          - name: SONAR_PROJECT_KEY
-            stringVal: common-sonar
-          workspaces:
-          - name: source-dir
-            workspace: common-workspace
-          - name: sonar-settings
-            workspace: sonar-settings
-        after:
-        - copy-source
-        when:
-          branch: 
-          - main
-      - name: gradle-build-and-publish
-        image: docker.io/gradle:7.3.1-jdk11
-        script: |
-          gradle build
-          gradle sonarqube
-          gradle publish
-        when:
-          tag:
-            - v.*
-      
+  clustertemplate:
+    metadata:
+      name: gradle-publish-integrationconfig-template
+    parameters:
+      - name: CONFIG_NAME
+        value: bookinfo-common-config
+      - name: CONFIG_SECRET
+        value: tmaxcloudck-docker-hub-secret
+      - name: GIT_TYPE
+        value: github
+      - name: GIT_REPO
+        value: tmax-cloud/bookinfo-common
+      - name: TOKEN_SECRET_NAME
+        value: yxzzzxh-git-token
+      - name: WORKSPACE_NAME
+        value: common-workspace
+      - name: PVC_NAME
+        value: common-pvc
+      - name: SONAR_HOST_URL_TPL
+        value: http://sonarqube.172.22.11.16.nip.io
+      - name: SONAR_PROJECT_KEY_TPL
+        value: common-sonar
